@@ -18,9 +18,11 @@ import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionType;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -42,10 +44,15 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
+    // --- SPRAWDZANIE WSZYSTKICH LIMITÓW ---
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
         checkAndDropLimit(player, Material.ENDER_PEARL, getConfig().getInt("limits.ender_pearl", 0));
         checkAndDropLimit(player, Material.GOLDEN_APPLE, getConfig().getInt("limits.golden_apple", 32));
+        
+        // Limity mikstur poziomu 2
+        checkAndDropPotionLimit(player, PotionType.STRENGTH, getConfig().getInt("limits.strength_2", 2));
+        checkAndDropPotionLimit(player, PotionType.SWIFTNESS, getConfig().getInt("limits.speed_2", 2));
     }
 
     private void checkAndDropLimit(Player player, Material material, int maxLimit) {
@@ -70,6 +77,55 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             }
             player.sendMessage(ChatColor.RED + "Masz za duzo " + material.name() + "! Przedmioty spadly na ziemie.");
         }
+    }
+
+    // --- METODA EGZEKWUJĄCA LIMIT DLA MIKSTUR TIER II ---
+    private void checkAndDropPotionLimit(Player player, PotionType targetType, int maxLimit) {
+        int total = countPotions(player, targetType);
+        if (total > maxLimit) {
+            int toRemove = total - maxLimit;
+            for (ItemStack item : player.getInventory().getContents()) {
+                if (isPotionOfTypeAndTier2(item, targetType)) {
+                    int amount = item.getAmount();
+                    if (amount <= toRemove) {
+                        toRemove -= amount;
+                        player.getInventory().removeItem(item);
+                        player.getWorld().dropItemNaturally(player.getLocation(), item);
+                    } else {
+                        item.setAmount(amount - toRemove);
+                        ItemStack dropped = item.clone();
+                        dropped.setAmount(toRemove);
+                        player.getWorld().dropItemNaturally(player.getLocation(), dropped);
+                        toRemove = 0;
+                    }
+                }
+                if (toRemove <= 0) break;
+            }
+            player.sendMessage(ChatColor.RED + "Masz za dużo potek " + targetType.name() + " II! Przedmioty spadły na ziemię.");
+        }
+    }
+
+    private boolean isPotionOfTypeAndTier2(ItemStack item, PotionType targetType) {
+        if (item == null) return false;
+        Material type = item.getType();
+        if (type == Material.POTION || type == Material.SPLASH_POTION || type == Material.LINGERING_POTION) {
+            if (item.getItemMeta() instanceof PotionMeta meta) {
+                if (meta.getBasePotionData() != null) {
+                    return meta.getBasePotionData().getType() == targetType && meta.getBasePotionData().isUpgraded();
+                }
+            }
+        }
+        return false;
+    }
+
+    private int countPotions(Player player, PotionType targetType) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (isPotionOfTypeAndTier2(item, targetType)) {
+                count += item.getAmount();
+            }
+        }
+        return count;
     }
 
     @EventHandler
@@ -109,7 +165,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return false;
     }
 
-    // --- ATAK PRZY UDERZENIU (LEWY PRZYCISK MYSZY) ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
@@ -139,7 +194,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BEZPOŚREDNIE ANULOWANIE RUCHU LUNGE (PRAWY/LEWY KLIK) ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
@@ -149,17 +203,13 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         if (isSpear(item)) {
             int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
             if (cdSeconds > 0) {
-                // JEŚLI JEST NA COOLDOWNIE: Blokujemy wybicie/LUNGE fizycznie!
                 if (player.hasCooldown(item.getType())) {
                     event.setCancelled(true);
-                    
-                    // Fizycznie kasujemy pęd ruchowy (zatrzymujemy gracza w miejscu)
                     Vector currentVel = player.getVelocity();
                     player.setVelocity(new Vector(0, Math.min(0, currentVel.getY()), 0));
                     return;
                 }
 
-                // JEŚLI NIE JEST NA COOLDOWNIE: Zaczynamy cooldown przy interakcji
                 if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK ||
                     event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
                     player.setCooldown(item.getType(), cdSeconds * 20);
@@ -212,7 +262,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
 
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [netherite/cobweb/pearls/gapples/mace_cooldown/spear_cooldown] [wartość]");
+            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [netherite/cobweb/pearls/gapples/strength_2/speed_2/mace_cooldown/spear_cooldown] [wartość]");
             return true;
         }
 
@@ -228,6 +278,10 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 getConfig().set("limits.ender_pearl", Integer.parseInt(val));
             } else if (option.equals("gapples")) {
                 getConfig().set("limits.golden_apple", Integer.parseInt(val));
+            } else if (option.equals("strength_2")) {
+                getConfig().set("limits.strength_2", Integer.parseInt(val));
+            } else if (option.equals("speed_2")) {
+                getConfig().set("limits.speed_2", Integer.parseInt(val));
             } else if (option.equals("mace_cooldown")) {
                 getConfig().set("cooldowns.mace", Integer.parseInt(val));
             } else if (option.equals("spear_cooldown")) {
@@ -250,7 +304,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            List<String> options = Arrays.asList("netherite", "cobweb", "pearls", "gapples", "mace_cooldown", "spear_cooldown");
+            List<String> options = Arrays.asList("netherite", "cobweb", "pearls", "gapples", "strength_2", "speed_2", "mace_cooldown", "spear_cooldown");
             for (String opt : options) {
                 if (opt.startsWith(args[0].toLowerCase())) completions.add(opt);
             }
@@ -258,7 +312,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             if (args[0].equalsIgnoreCase("netherite")) {
                 completions.addAll(Arrays.asList("true", "false"));
             } else {
-                completions.addAll(Arrays.asList("0", "5", "10", "16", "32"));
+                completions.addAll(Arrays.asList("0", "1", "2", "3", "5", "10", "16", "32"));
             }
         }
         return completions;

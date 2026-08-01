@@ -1,0 +1,8 @@
+name: SMPCustomization
+version: 1.0
+main: pl.twojadomena.smp.SMPCustomization
+api-version: '1.21'
+commands:
+  smpconfig:
+    description: Ustawienia SMP
+    permission: smp.admin

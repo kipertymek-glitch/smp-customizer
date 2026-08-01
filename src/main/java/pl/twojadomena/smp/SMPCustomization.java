@@ -11,6 +11,7 @@ import org.bukkit.entity.Trident;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -45,7 +46,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     // --- ENFORCE ITEM AND POTION LIMITS ---
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
-        checkAndDropLimit(player, Material.ENDER_PEARL, getConfig().getInt("limits.ender_pearl", 0));
         checkAndDropLimit(player, Material.GOLDEN_APPLE, getConfig().getInt("limits.golden_apple", 32));
         
         checkAndDropPotionLimit(player, PotionType.STRENGTH, getConfig().getInt("limits.strength_2", 2));
@@ -185,13 +185,14 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return true;
     }
 
-    // --- ATTACKS WITH WEAPONS ---
+    // --- WEAPON ATTACKS (MACE, TRIDENT, SPEAR) ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
             ItemStack mainHand = player.getInventory().getItemInMainHand();
+            String matName = mainHand.getType().name();
 
-            if (mainHand.getType().name().equalsIgnoreCase("MACE")) {
+            if (matName.equalsIgnoreCase("MACE")) {
                 int cdSeconds = getConfig().getInt("cooldowns.mace", 0);
                 if (cdSeconds > 0) {
                     if (player.hasCooldown(mainHand.getType())) {
@@ -210,20 +211,33 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                     }
                 }
             }
+
+            if (matName.contains("SPEAR")) {
+                int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
+                if (cdSeconds > 0) {
+                    if (player.hasCooldown(mainHand.getType())) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                    player.setCooldown(mainHand.getType(), cdSeconds * 20);
+                }
+            }
         }
     }
 
-    // --- OTHER INTERACTIONS ---
+    // --- BLOCK THROWING ENDER PEARLS ONLY ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         ItemStack item = event.getItem();
         if (item == null) return;
 
         if (item.getType() == Material.ENDER_PEARL) {
-            int max = getConfig().getInt("limits.ender_pearl", 0);
-            if (max <= 0) {
-                event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.RED + "Ender pearls are completely disabled!");
+            if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                int maxPearlLimit = getConfig().getInt("limits.ender_pearl", 0);
+                if (maxPearlLimit <= 0) {
+                    event.setCancelled(true);
+                    event.getPlayer().sendMessage(ChatColor.RED + "Throwing Ender Pearls is disabled on this server!");
+                }
             }
         }
     }
@@ -298,6 +312,8 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 getConfig().set("cooldowns.mace", Integer.parseInt(val));
             } else if (option.equals("trident_cooldown")) {
                 getConfig().set("cooldowns.trident", Integer.parseInt(val));
+            } else if (option.equals("spear_cooldown")) {
+                getConfig().set("cooldowns.spear", Integer.parseInt(val));
             } else {
                 sender.sendMessage(ChatColor.RED + "Unknown option!");
                 return true;
@@ -333,7 +349,8 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 "strength_2", 
                 "speed_2", 
                 "mace_cooldown", 
-                "trident_cooldown"
+                "trident_cooldown",
+                "spear_cooldown"
             );
             for (String opt : options) {
                 if (opt.startsWith(args[0].toLowerCase())) completions.add(opt);

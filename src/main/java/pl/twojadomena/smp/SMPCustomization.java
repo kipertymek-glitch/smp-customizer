@@ -17,6 +17,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerRiptideEvent;
@@ -130,19 +131,30 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player player) {
-            getServer().getScheduler().runTask(this, () -> enforceLimits(player));
-        }
-    }
-
-    // --- BLOKOWANIE STOŁU KOWALSKIEGO DLA NETHERITU ---
+    // --- STÓŁ KOWALSKI (SMITHING TABLE) BLOKADA WYNIKU I KLIKNIĘCIA ---
     @EventHandler
     public void onPrepareSmithing(PrepareSmithingEvent event) {
         ItemStack result = event.getResult();
         if (result != null && isBlockedNetheriteItem(result.getType())) {
-            event.setResult(null);
+            event.setResult(null); // Czyszczenie podglądu wyniku
+        }
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player) {
+            getServer().getScheduler().runTask(this, () -> enforceLimits(player));
+
+            // Blokowanie wyciągania zablokowanych przedmiotów ze Stołu Kowalskiego (slot wyjściowy: RESULT / slot 3)
+            if (event.getInventory().getType() == InventoryType.SMITHING) {
+                if (event.getSlotType() == InventoryType.SlotType.RESULT) {
+                    ItemStack currentItem = event.getCurrentItem();
+                    if (currentItem != null && isBlockedNetheriteItem(currentItem.getType())) {
+                        event.setCancelled(true);
+                        player.sendMessage(ChatColor.RED + "Tworzenie tego przedmiotu z netheritu jest zablokowane!");
+                    }
+                }
+            }
         }
     }
 
@@ -157,15 +169,18 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
+    // GŁÓWNA LOGIKA BLOKADY NETHERITU (MIECZ JEST ZAWSZE DOZWOLONY)
     private boolean isBlockedNetheriteItem(Material m) {
         if (!m.name().startsWith("NETHERITE_") || m == Material.NETHERITE_SWORD || m == Material.NETHERITE_INGOT || m == Material.NETHERITE_SCRAP) {
             return false;
         }
 
+        // Jeśli netherite.blocked_except_sword = true (domyślnie), blokuje wszystko oprócz miecza
         if (getConfig().getBoolean("netherite.blocked_except_sword", true)) {
             return true;
         }
 
+        // Sprawdzanie poszczególnych elementów w konfiguracji
         String itemName = m.name().toLowerCase().replace("netherite_", "");
         return getConfig().getBoolean("netherite.blocked_items." + itemName, false);
     }
@@ -213,7 +228,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- NAKŁADANIE COOLDOWNU PO FAKTYCZNYM RZUCIE TRÓJZAŁEM ---
+    // --- NAKŁADANIE COOLDOWNU PO RZUCIE ---
     @EventHandler
     public void onTridentThrow(ProjectileLaunchEvent event) {
         if (event.getEntity() instanceof Trident && event.getEntity().getShooter() instanceof Player player) {
@@ -224,7 +239,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- NAKŁADANIE COOLDOWNU PO FAKTYCZNYM UŻYCIU RIPTIDE ---
+    // --- NAKŁADANIE COOLDOWNU PO RIPTIDE ---
     @EventHandler
     public void onRiptide(PlayerRiptideEvent event) {
         Player player = event.getPlayer();

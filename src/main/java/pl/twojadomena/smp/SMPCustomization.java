@@ -24,7 +24,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionType;
-import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -138,7 +137,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BLOKOWANIE STOŁU KOWALSKIEGO (SMITHING TABLE) DLA NETHERITU ---
+    // --- BLOKOWANIE STOŁU KOWALSKIEGO DLA NETHERITU ---
     @EventHandler
     public void onPrepareSmithing(PrepareSmithingEvent event) {
         ItemStack result = event.getResult();
@@ -171,7 +170,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return getConfig().getBoolean("netherite.blocked_items." + itemName, false);
     }
 
-    // --- ATAKI Z TRIDENTA ORAZ MACA ---
+    // --- ATAKI Z MACA ORAZ TRIDENTA ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
@@ -199,28 +198,17 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BLOKADA PRÓBY UŻYCIA TRÓJZAŁA PODCZAS AKTYWNEGO COOLDOWNU ---
+    // --- INNE INTERAKCJE (PERŁY) ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
         ItemStack item = event.getItem();
         if (item == null) return;
-
-        if (item.getType() == Material.TRIDENT) {
-            int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
-            if (cdSeconds > 0 && player.hasCooldown(Material.TRIDENT)) {
-                event.setCancelled(true);
-                Vector currentVel = player.getVelocity();
-                player.setVelocity(new Vector(0, Math.min(0, currentVel.getY()), 0));
-                return;
-            }
-        }
 
         if (item.getType() == Material.ENDER_PEARL) {
             int max = getConfig().getInt("limits.ender_pearl", 0);
             if (max <= 0) {
                 event.setCancelled(true);
-                player.sendMessage(ChatColor.RED + "Perły są całkowicie wyłączone!");
+                event.getPlayer().sendMessage(ChatColor.RED + "Perły są całkowicie wyłączone!");
             }
         }
     }

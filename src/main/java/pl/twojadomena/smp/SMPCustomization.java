@@ -21,8 +21,6 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 import org.bukkit.util.Vector;
 
@@ -39,9 +37,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         if (getCommand("smpconfig") != null) {
             getCommand("smpconfig").setExecutor(this);
             getCommand("smpconfig").setTabCompleter(this);
-        }
-        if (getCommand("buffs") != null) {
-            getCommand("buffs").setExecutor(this);
         }
     }
 
@@ -141,19 +136,17 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BLOKOWANIE STOŁU KOWALSKIEGO (SMITHING TABLE) DLA ZBROI I TOOLÓW NETHERITOWYCH ---
+    // --- BLOKOWANIE STOŁU KOWALSKIEGO (SMITHING TABLE) DLA NETHERITU (OPRÓCZ MIECZA) ---
     @EventHandler
     public void onPrepareSmithing(PrepareSmithingEvent event) {
         if (!getConfig().getBoolean("netherite.blocked_except_sword", true)) return;
         
         ItemStack result = event.getResult();
         if (result != null && isBlockedNetheriteItem(result.getType())) {
-            // Ukrywamy/kasujemy wynik rzemiosła – player w ogóle nie stworzy przedmiotu!
             event.setResult(null);
         }
     }
 
-    // Asekuracyjnie blokujemy również zwykły Crafting (gdyby istniał jakiś customowy przepis)
     @EventHandler
     public void onCraft(CraftItemEvent event) {
         if (!getConfig().getBoolean("netherite.blocked_except_sword", true)) return;
@@ -251,19 +244,9 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return count;
     }
 
+    // --- KOMENDA KONFIGURACYJNA ---
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (command.getName().equalsIgnoreCase("buffs")) {
-            if (sender instanceof Player player) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 3600, 1, false, true));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 3600, 1, false, true));
-                player.sendMessage(ChatColor.GREEN + "Dostałeś Strength II oraz Speed II na 3 minuty!");
-            } else {
-                sender.sendMessage("Tylko gracz może użyć tej komendy!");
-            }
-            return true;
-        }
-
         if (!sender.hasPermission("smp.admin")) {
             sender.sendMessage(ChatColor.RED + "Nie masz uprawnień!");
             return true;

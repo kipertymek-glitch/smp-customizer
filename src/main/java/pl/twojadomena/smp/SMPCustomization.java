@@ -96,44 +96,70 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
+    // Pomocnicza funkcja sprawdzająca czy przedmiot to SPEAR
+    private boolean isSpear(ItemStack item) {
+        if (item == null || item.getType() == Material.AIR) return false;
+        String typeName = item.getType().name();
+        if (typeName.contains("SPEAR")) return true;
+        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+            return item.getItemMeta().getDisplayName().toUpperCase().contains("SPEAR") || 
+                   item.getItemMeta().getDisplayName().toUpperCase().contains("WŁÓCZNIA");
+        }
+        return false;
+    }
+
+    // --- ATAK LEWYM PRZYCISKIEM MYSZY (UDERZENIE ENCYJI) ---
     @EventHandler
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
-            Material mainHand = player.getInventory().getItemInMainHand().getType();
+            ItemStack mainHand = player.getInventory().getItemInMainHand();
 
-            if (mainHand.name().equalsIgnoreCase("MACE")) {
+            // Mace Cooldown
+            if (mainHand.getType().name().equalsIgnoreCase("MACE")) {
                 int cdSeconds = getConfig().getInt("cooldowns.mace", 0);
                 if (cdSeconds > 0) {
-                    if (player.hasCooldown(mainHand)) {
+                    if (player.hasCooldown(mainHand.getType())) {
                         event.setCancelled(true);
                         player.sendMessage(ChatColor.RED + "Mace jest na cooldownie!");
                         return;
                     }
-                    player.setCooldown(mainHand, cdSeconds * 20);
+                    player.setCooldown(mainHand.getType(), cdSeconds * 20);
+                }
+            }
+
+            // Spear Cooldown (Lewy przycisk na moba/gracza)
+            if (isSpear(mainHand)) {
+                int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
+                if (cdSeconds > 0) {
+                    if (player.hasCooldown(mainHand.getType())) {
+                        event.setCancelled(true);
+                        player.sendMessage(ChatColor.RED + "Spear jest na cooldownie!");
+                        return;
+                    }
+                    player.setCooldown(mainHand.getType(), cdSeconds * 20);
                 }
             }
         }
     }
 
+    // --- MACHNIĘCIE LEWYM PRZYCISKIEM W POWIETRZE / BLOK ---
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
-        
         if (item == null) return;
 
-        // POPRAWIONY SPEAR / TRIDENT COOLDOWN
-        if (item.getType() == Material.TRIDENT) {
-            if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+        // Machnięcie Spear lewym przyciskiem
+        if (isSpear(item)) {
+            if (event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
                 int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
                 if (cdSeconds > 0) {
-                    if (player.hasCooldown(Material.TRIDENT)) {
+                    if (player.hasCooldown(item.getType())) {
                         event.setCancelled(true);
-                        player.sendMessage(ChatColor.RED + "Trójząb / Spear jest obecnie na cooldownie!");
+                        player.sendMessage(ChatColor.RED + "Spear jest na cooldownie!");
                         return;
                     }
-                    // Nakładamy cooldown po użyciu
-                    player.setCooldown(Material.TRIDENT, cdSeconds * 20);
+                    player.setCooldown(item.getType(), cdSeconds * 20);
                 }
             }
         }
@@ -164,18 +190,16 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return count;
     }
 
-    // Pomocnicza metoda do dawania potków (Strength II i Speed II na 3 minuty = 3600 tików)
-    public void giveBuffs(Player player) {
-        player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 3600, 1)); // level 2 (amplifier 1 = level 2)
-        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 3600, 1));    // level 2 (amplifier 1 = level 2)
-        player.sendMessage(ChatColor.GREEN + "Otrzymałeś efekty Strength II i Speed II na 3 minuty!");
-    }
-
+    // --- KOMENDA NA POTKI (Strength II i Speed II) ---
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("buffs")) {
             if (sender instanceof Player player) {
-                giveBuffs(player);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 3600, 1, false, true));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 3600, 1, false, true));
+                player.sendMessage(ChatColor.GREEN + "Dostałeś Strength II oraz Speed II na 3 minuty!");
+            } else {
+                sender.sendMessage("Tylko gracz może użyć tej komendy!");
             }
             return true;
         }

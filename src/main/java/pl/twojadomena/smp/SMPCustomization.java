@@ -34,7 +34,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- 1. SPRAWDZANIE LIMITÓW W EQ (Ekwipunek, Podnoszenie, Klikanie) ---
+    // --- 1. ENFORCE INVENTORY LIMITS ---
 
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
@@ -62,7 +62,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
                 if (toRemove <= 0) break;
             }
-            player.sendMessage(ChatColor.RED + "Masz za dużo " + material.name() + " w eq! Nadmiar wyrzucono na ziemię (Limit: " + maxLimit + ").");
+            player.sendMessage(ChatColor.RED + "You have too many " + material.name() + " in your inventory! Excess items were dropped on the ground (Limit: " + maxLimit + ").");
         }
     }
 
@@ -80,7 +80,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- 2. BLOKADA CRAFTINGU NETHERITU ---
+    // --- 2. NETHERITE CRAFTING RESTRICTION ---
 
     @EventHandler
     public void onCraft(CraftItemEvent event) {
@@ -89,28 +89,28 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         if (isNetheriteItem(result) && result != Material.NETHERITE_SWORD) {
             event.setCancelled(true);
             if (event.getWhoClicked() instanceof Player player) {
-                player.sendMessage(ChatColor.RED + "Tworzenie tej części Netheritu jest zablokowane!");
+                player.sendMessage(ChatColor.RED + "Crafting this Netherite item is disabled on this server!");
             }
         }
     }
 
-    // --- 3. COOLDOWN DLA MACE I SPEAR / TRIDENT oraz PERŁY / REFIE ---
+    // --- 3. COOLDOWNS & ITEM RESTRICTIONS ---
 
     @EventHandler
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
             Material mainHand = player.getInventory().getItemInMainHand().getType();
 
-            // Mace Cooldown
-            if (mainHand == Material.MACE) {
+            // Mace Cooldown (checked safely by name)
+            if (mainHand.name().equals("MACE")) {
                 int cdSeconds = getConfig().getInt("cooldowns.mace", 0);
                 if (cdSeconds > 0) {
-                    if (player.hasCooldown(Material.MACE)) {
+                    if (player.hasCooldown(mainHand)) {
                         event.setCancelled(true);
-                        player.sendMessage(ChatColor.RED + "Buława (Mace) odnawia się!");
+                        player.sendMessage(ChatColor.RED + "Mace is currently on cooldown!");
                         return;
                     }
-                    player.setCooldown(Material.MACE, cdSeconds * 20);
+                    player.setCooldown(mainHand, cdSeconds * 20);
                 }
             }
         }
@@ -122,25 +122,25 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         ItemStack item = event.getItem();
         if (item == null) return;
 
-        // Spear (Trident) Cooldown przy użyciu/rzucie
+        // Spear / Trident Cooldown
         if (item.getType() == Material.TRIDENT) {
             int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
             if (cdSeconds > 0) {
                 if (player.hasCooldown(Material.TRIDENT)) {
                     event.setCancelled(true);
-                    player.sendMessage(ChatColor.RED + "Oszczep/Trójząb odnawia się!");
+                    player.sendMessage(ChatColor.RED + "Trident / Spear is currently on cooldown!");
                     return;
                 }
                 player.setCooldown(Material.TRIDENT, cdSeconds * 20);
             }
         }
 
-        // Blokada pereł przy kliknięciu jeśli limit = 0
+        // Ender Pearl check when limit is 0
         if (item.getType() == Material.ENDER_PEARL) {
             int max = getConfig().getInt("limits.ender_pearl", 0);
             if (max <= 0) {
                 event.setCancelled(true);
-                player.sendMessage(ChatColor.RED + "Perły Endera są całkowicie zablokowane!");
+                player.sendMessage(ChatColor.RED + "Ender Pearls are completely disabled!");
             }
         }
     }
@@ -150,7 +150,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         enforceLimits(event.getPlayer());
     }
 
-    // --- POMOCNICZE METODY ---
+    // --- HELPER METHODS ---
 
     private boolean isNetheriteItem(Material m) {
         return m.name().startsWith("NETHERITE_") && m != Material.NETHERITE_INGOT && m != Material.NETHERITE_SCRAP;
@@ -164,17 +164,17 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return count;
     }
 
-    // --- 4. KOMENDA Z ZAPISYWANIEM USTAWIEŃ ---
+    // --- 4. COMMAND HANDLER ---
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("smp.admin")) {
-            sender.sendMessage(ChatColor.RED + "Brak uprawnień!");
+            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command!");
             return true;
         }
 
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [netherite/cobweb/pearls/gapples/mace_cooldown/spear_cooldown] [wartość]");
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /smpconfig [netherite/cobweb/pearls/gapples/mace_cooldown/spear_cooldown] [value]");
             return true;
         }
 
@@ -190,20 +190,20 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 case "mace_cooldown" -> getConfig().set("cooldowns.mace", Integer.parseInt(val));
                 case "spear_cooldown" -> getConfig().set("cooldowns.spear", Integer.parseInt(val));
                 default -> {
-                    sender.sendMessage(ChatColor.RED + "Nieznana opcja!");
+                    sender.sendMessage(ChatColor.RED + "Unknown option!");
                     return true;
                 }
             }
             saveConfig();
-            sender.sendMessage(ChatColor.GREEN + "Pomyślnie zmieniono " + option + " na " + val + "!");
+            sender.sendMessage(ChatColor.GREEN + "Successfully set " + option + " to " + val + "!");
         } catch (Exception e) {
-            sender.sendMessage(ChatColor.RED + "Niepoprawna wartość!");
+            sender.sendMessage(ChatColor.RED + "Invalid value!");
         }
 
         return true;
     }
 
-    // --- 5. TAB COMPLETER (Podpowiedzi komend) ---
+    // --- 5. TAB COMPLETER ---
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {

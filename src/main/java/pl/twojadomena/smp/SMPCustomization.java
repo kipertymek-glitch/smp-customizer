@@ -34,7 +34,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- 1. ENFORCE INVENTORY LIMITS ---
+    // --- INVENTORY LIMITS ---
 
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
@@ -80,7 +80,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- 2. NETHERITE CRAFTING RESTRICTION ---
+    // --- CRAFTING RESTRICTION ---
 
     @EventHandler
     public void onCraft(CraftItemEvent event) {
@@ -94,14 +94,13 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- 3. COOLDOWNS & ITEM RESTRICTIONS ---
+    // --- COOLDOWNS & RESTRICTIONS ---
 
     @EventHandler
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
             Material mainHand = player.getInventory().getItemInMainHand().getType();
 
-            // Mace Cooldown (checked safely by name)
             if (mainHand.name().equals("MACE")) {
                 int cdSeconds = getConfig().getInt("cooldowns.mace", 0);
                 if (cdSeconds > 0) {
@@ -122,7 +121,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         ItemStack item = event.getItem();
         if (item == null) return;
 
-        // Spear / Trident Cooldown
         if (item.getType() == Material.TRIDENT) {
             int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
             if (cdSeconds > 0) {
@@ -135,7 +133,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             }
         }
 
-        // Ender Pearl check when limit is 0
         if (item.getType() == Material.ENDER_PEARL) {
             int max = getConfig().getInt("limits.ender_pearl", 0);
             if (max <= 0) {
@@ -164,7 +161,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return count;
     }
 
-    // --- 4. COMMAND HANDLER ---
+    // --- COMMAND HANDLER ---
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -203,7 +200,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return true;
     }
 
-    // --- 5. TAB COMPLETER ---
+    // --- TAB COMPLETER ---
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {

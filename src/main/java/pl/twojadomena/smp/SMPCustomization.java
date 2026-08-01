@@ -96,7 +96,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // Pomocnicza funkcja sprawdzająca czy przedmiot to SPEAR
     private boolean isSpear(ItemStack item) {
         if (item == null || item.getType() == Material.AIR) return false;
         String typeName = item.getType().name();
@@ -108,13 +107,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return false;
     }
 
-    // --- ATAK LEWYM PRZYCISKIEM MYSZY (UDERZENIE ENCYJI) ---
+    // --- ATAK MACE ORAZ LEWY PRZYCISK NA MOBA ---
     @EventHandler
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
             ItemStack mainHand = player.getInventory().getItemInMainHand();
 
-            // Mace Cooldown
             if (mainHand.getType().name().equalsIgnoreCase("MACE")) {
                 int cdSeconds = getConfig().getInt("cooldowns.mace", 0);
                 if (cdSeconds > 0) {
@@ -127,7 +125,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
             }
 
-            // Spear Cooldown (Lewy przycisk na moba/gracza)
             if (isSpear(mainHand)) {
                 int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
                 if (cdSeconds > 0) {
@@ -142,23 +139,26 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- MACHNIĘCIE LEWYM PRZYCISKIEM W POWIETRZE / BLOK ---
+    // --- BLOKADA RUCHU / LUNGE (PRAWY I LEWY PRZYCISK) ---
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
         if (item == null) return;
 
-        // Machnięcie Spear lewym przyciskiem
         if (isSpear(item)) {
-            if (event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
-                int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
-                if (cdSeconds > 0) {
-                    if (player.hasCooldown(item.getType())) {
-                        event.setCancelled(true);
-                        player.sendMessage(ChatColor.RED + "Spear jest na cooldownie!");
-                        return;
-                    }
+            int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
+            if (cdSeconds > 0) {
+                // JEŚLI JEST NA COOLDOWNIE: Blokujemy każdy klik (zarówno lewy jak i prawy/lunge)
+                if (player.hasCooldown(item.getType())) {
+                    event.setCancelled(true);
+                    player.sendMessage(ChatColor.RED + "Spear jest na cooldownie! Nie mozesz uzyc lunge!");
+                    return;
+                }
+
+                // JEŚLI NIE JEST NA COOLDOWNIE: Nakładamy cooldown przy próbie lunge (Prawy Klik) lub zamachu (Lewy Klik)
+                if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK ||
+                    event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
                     player.setCooldown(item.getType(), cdSeconds * 20);
                 }
             }
@@ -190,7 +190,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return count;
     }
 
-    // --- KOMENDA NA POTKI (Strength II i Speed II) ---
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (command.getName().equalsIgnoreCase("buffs")) {

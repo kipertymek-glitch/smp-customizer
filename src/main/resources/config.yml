@@ -1,0 +1,6 @@
+limits:
+  cobweb: 16
+  ender_pearl: 0
+  golden_apple: 32
+netherite:
+  blocked_except_sword: true

@@ -60,21 +60,33 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
                 if (toRemove <= 0) break;
             }
-            player.sendMessage(ChatColor.RED + "You have too many " + material.name() + " in your inventory! Excess dropped on ground (Limit: " + maxLimit + ").");
+            player.sendMessage(ChatColor.RED + "Masz za duzo " + material.name() + "! Przedmioty spadly na ziemie.");
         }
     }
 
     @EventHandler
     public void onPickup(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player player) {
-            getServer().getScheduler().runTask(this, () -> enforceLimits(player));
+        if (event.getEntity() instanceof Player) {
+            Player player = (Player) event.getEntity();
+            getServer().getScheduler().runTask(this, new Runnable() {
+                @Override
+                public void run() {
+                    enforceLimits(player);
+                }
+            });
         }
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player player) {
-            getServer().getScheduler().runTask(this, () -> enforceLimits(player));
+        if (event.getWhoClicked() instanceof Player) {
+            Player player = (Player) event.getWhoClicked();
+            getServer().getScheduler().runTask(this, new Runnable() {
+                @Override
+                public void run() {
+                    enforceLimits(player);
+                }
+            });
         }
     }
 
@@ -84,23 +96,25 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         Material result = event.getRecipe().getResult().getType();
         if (isNetheriteItem(result) && result != Material.NETHERITE_SWORD) {
             event.setCancelled(true);
-            if (event.getWhoClicked() instanceof Player player) {
-                player.sendMessage(ChatColor.RED + "Crafting this Netherite item is disabled on this server!");
+            if (event.getWhoClicked() instanceof Player) {
+                Player player = (Player) event.getWhoClicked();
+                player.sendMessage(ChatColor.RED + "Tworzenie tego przedmiotu z netheritu jest zablokowane!");
             }
         }
     }
 
     @EventHandler
     public void onAttack(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Player player) {
+        if (event.getDamager() instanceof Player) {
+            Player player = (Player) event.getDamager();
             Material mainHand = player.getInventory().getItemInMainHand().getType();
 
-            if (mainHand.name().equals("MACE")) {
+            if (mainHand.name().equalsIgnoreCase("MACE")) {
                 int cdSeconds = getConfig().getInt("cooldowns.mace", 0);
                 if (cdSeconds > 0) {
                     if (player.hasCooldown(mainHand)) {
                         event.setCancelled(true);
-                        player.sendMessage(ChatColor.RED + "Mace is currently on cooldown!");
+                        player.sendMessage(ChatColor.RED + "Mace jest na cooldownie!");
                         return;
                     }
                     player.setCooldown(mainHand, cdSeconds * 20);
@@ -120,7 +134,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             if (cdSeconds > 0) {
                 if (player.hasCooldown(Material.TRIDENT)) {
                     event.setCancelled(true);
-                    player.sendMessage(ChatColor.RED + "Trident / Spear is currently on cooldown!");
+                    player.sendMessage(ChatColor.RED + "Trójząb jest na cooldownie!");
                     return;
                 }
                 player.setCooldown(Material.TRIDENT, cdSeconds * 20);
@@ -131,7 +145,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             int max = getConfig().getInt("limits.ender_pearl", 0);
             if (max <= 0) {
                 event.setCancelled(true);
-                player.sendMessage(ChatColor.RED + "Ender Pearls are completely disabled!");
+                player.sendMessage(ChatColor.RED + "Perły są całkowicie wyłączone!");
             }
         }
     }
@@ -156,12 +170,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("smp.admin")) {
-            sender.sendMessage(ChatColor.RED + "You do not have permission to use this command!");
+            sender.sendMessage(ChatColor.RED + "Nie masz uprawnień!");
             return true;
         }
 
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.YELLOW + "Usage: /smpconfig [netherite/cobweb/pearls/gapples/mace_cooldown/spear_cooldown] [value]");
+            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [netherite/cobweb/pearls/gapples/mace_cooldown/spear_cooldown] [wartość]");
             return true;
         }
 
@@ -169,22 +183,27 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         String val = args[1];
 
         try {
-            switch (option) {
-                case "netherite" -> getConfig().set("netherite.blocked_except_sword", Boolean.parseBoolean(val));
-                case "cobweb" -> getConfig().set("limits.cobweb", Integer.parseInt(val));
-                case "pearls" -> getConfig().set("limits.ender_pearl", Integer.parseInt(val));
-                case "gapples" -> getConfig().set("limits.golden_apple", Integer.parseInt(val));
-                case "mace_cooldown" -> getConfig().set("cooldowns.mace", Integer.parseInt(val));
-                case "spear_cooldown" -> getConfig().set("cooldowns.spear", Integer.parseInt(val));
-                default -> {
-                    sender.sendMessage(ChatColor.RED + "Unknown option!");
-                    return true;
-                }
+            if (option.equals("netherite")) {
+                getConfig().set("netherite.blocked_except_sword", Boolean.parseBoolean(val));
+            } else if (option.equals("cobweb")) {
+                getConfig().set("limits.cobweb", Integer.parseInt(val));
+            } else if (option.equals("pearls")) {
+                getConfig().set("limits.ender_pearl", Integer.parseInt(val));
+            } else if (option.equals("gapples")) {
+                getConfig().set("limits.golden_apple", Integer.parseInt(val));
+            } else if (option.equals("mace_cooldown")) {
+                getConfig().set("cooldowns.mace", Integer.parseInt(val));
+            } else if (option.equals("spear_cooldown")) {
+                getConfig().set("cooldowns.spear", Integer.parseInt(val));
+            } else {
+                sender.sendMessage(ChatColor.RED + "Nieznana opcja!");
+                return true;
             }
+
             saveConfig();
-            sender.sendMessage(ChatColor.GREEN + "Successfully set " + option + " to " + val + "!");
+            sender.sendMessage(ChatColor.GREEN + "Ustawiono " + option + " na " + val + "!");
         } catch (Exception e) {
-            sender.sendMessage(ChatColor.RED + "Invalid value!");
+            sender.sendMessage(ChatColor.RED + "Błędna wartość!");
         }
 
         return true;
@@ -192,7 +211,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> completions = new ArrayList<>();
+        List<String> completions = new ArrayList<String>();
         if (args.length == 1) {
             List<String> options = Arrays.asList("netherite", "cobweb", "pearls", "gapples", "mace_cooldown", "spear_cooldown");
             for (String opt : options) {

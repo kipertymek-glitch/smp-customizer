@@ -6,5 +6,3 @@ commands:
   smpconfig:
     description: Zarzadzanie konfiguracja SMP
     permission: smp.admin
-  buffs:
-    description: Daje efekty Strength II oraz Speed II

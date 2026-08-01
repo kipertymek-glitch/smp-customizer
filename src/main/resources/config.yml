@@ -2,5 +2,10 @@ limits:
   cobweb: 16
   ender_pearl: 0
   golden_apple: 32
+
+cooldowns:
+  mace: 3      # Cooldown w sekundach na buławę
+  spear: 5     # Cooldown w sekundach na trójząb / oszczep
+
 netherite:
   blocked_except_sword: true

@@ -10,7 +10,7 @@ cooldowns:
   trident: 3
 
 netherite:
-  allow_crafting: false # Jeśli damy 'true', wszystko z netheritu można robić. Jeśli 'false', można robić TYLKO miecz.
+  allow_crafting: false 
   blocked_items:
     helmet: false
     chestplate: false

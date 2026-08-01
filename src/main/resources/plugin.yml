@@ -1,8 +1,18 @@
 name: SMPCustomization
-version: 1.0
+version: 1.0.0
 main: pl.twojadomena.smp.SMPCustomization
-api-version: '1.21'
+api-version: 1.21
+author: RQ9__
+description: A plugin for enforcing item limits, weapon cooldowns, and Netherite crafting restrictions on SMP servers.
+
 commands:
   smpconfig:
-    description: Zarzadzanie konfiguracja SMP
+    description: Configures SMP Customization settings live in-game.
+    usage: /<command> [option] [value]
     permission: smp.admin
+    permission-message: You do not have permission to use this command!
+
+permissions:
+  smp.admin:
+    description: Allows access to the /smpconfig command.
+    default: op

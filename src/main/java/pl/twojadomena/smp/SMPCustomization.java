@@ -9,6 +9,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -17,6 +18,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +34,9 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         if (getCommand("smpconfig") != null) {
             getCommand("smpconfig").setExecutor(this);
             getCommand("smpconfig").setTabCompleter(this);
+        }
+        if (getCommand("buffs") != null) {
+            getCommand("buffs").setExecutor(this);
         }
     }
 
@@ -66,27 +72,15 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
     @EventHandler
     public void onPickup(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player) {
-            Player player = (Player) event.getEntity();
-            getServer().getScheduler().runTask(this, new Runnable() {
-                @Override
-                public void run() {
-                    enforceLimits(player);
-                }
-            });
+        if (event.getEntity() instanceof Player player) {
+            getServer().getScheduler().runTask(this, () -> enforceLimits(player));
         }
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player) {
-            Player player = (Player) event.getWhoClicked();
-            getServer().getScheduler().runTask(this, new Runnable() {
-                @Override
-                public void run() {
-                    enforceLimits(player);
-                }
-            });
+        if (event.getWhoClicked() instanceof Player player) {
+            getServer().getScheduler().runTask(this, () -> enforceLimits(player));
         }
     }
 
@@ -96,8 +90,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         Material result = event.getRecipe().getResult().getType();
         if (isNetheriteItem(result) && result != Material.NETHERITE_SWORD) {
             event.setCancelled(true);
-            if (event.getWhoClicked() instanceof Player) {
-                Player player = (Player) event.getWhoClicked();
+            if (event.getWhoClicked() instanceof Player player) {
                 player.sendMessage(ChatColor.RED + "Tworzenie tego przedmiotu z netheritu jest zablokowane!");
             }
         }
@@ -105,8 +98,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
     @EventHandler
     public void onAttack(EntityDamageByEntityEvent event) {
-        if (event.getDamager() instanceof Player) {
-            Player player = (Player) event.getDamager();
+        if (event.getDamager() instanceof Player player) {
             Material mainHand = player.getInventory().getItemInMainHand().getType();
 
             if (mainHand.name().equalsIgnoreCase("MACE")) {
@@ -127,17 +119,22 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
+        
         if (item == null) return;
 
+        // POPRAWIONY SPEAR / TRIDENT COOLDOWN
         if (item.getType() == Material.TRIDENT) {
-            int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
-            if (cdSeconds > 0) {
-                if (player.hasCooldown(Material.TRIDENT)) {
-                    event.setCancelled(true);
-                    player.sendMessage(ChatColor.RED + "Trójząb jest na cooldownie!");
-                    return;
+            if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+                int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
+                if (cdSeconds > 0) {
+                    if (player.hasCooldown(Material.TRIDENT)) {
+                        event.setCancelled(true);
+                        player.sendMessage(ChatColor.RED + "Trójząb / Spear jest obecnie na cooldownie!");
+                        return;
+                    }
+                    // Nakładamy cooldown po użyciu
+                    player.setCooldown(Material.TRIDENT, cdSeconds * 20);
                 }
-                player.setCooldown(Material.TRIDENT, cdSeconds * 20);
             }
         }
 
@@ -167,8 +164,22 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return count;
     }
 
+    // Pomocnicza metoda do dawania potków (Strength II i Speed II na 3 minuty = 3600 tików)
+    public void giveBuffs(Player player) {
+        player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 3600, 1)); // level 2 (amplifier 1 = level 2)
+        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 3600, 1));    // level 2 (amplifier 1 = level 2)
+        player.sendMessage(ChatColor.GREEN + "Otrzymałeś efekty Strength II i Speed II na 3 minuty!");
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("buffs")) {
+            if (sender instanceof Player player) {
+                giveBuffs(player);
+            }
+            return true;
+        }
+
         if (!sender.hasPermission("smp.admin")) {
             sender.sendMessage(ChatColor.RED + "Nie masz uprawnień!");
             return true;
@@ -211,7 +222,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
-        List<String> completions = new ArrayList<String>();
+        List<String> completions = new ArrayList<>();
         if (args.length == 1) {
             List<String> options = Arrays.asList("netherite", "cobweb", "pearls", "gapples", "mace_cooldown", "spear_cooldown");
             for (String opt : options) {

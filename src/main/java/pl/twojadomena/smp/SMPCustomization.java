@@ -60,7 +60,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
                 if (toRemove <= 0) break;
             }
-            player.sendMessage(ChatColor.RED + "You have too many " + material.name() + " in your inventory! Excess items were dropped on the ground (Limit: " + maxLimit + ").");
+            player.sendMessage(ChatColor.RED + "You have too many " + material.name() + " in your inventory! Excess dropped on ground (Limit: " + maxLimit + ").");
         }
     }
 

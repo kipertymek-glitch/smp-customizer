@@ -136,11 +136,9 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BLOKOWANIE STOŁU KOWALSKIEGO (SMITHING TABLE) DLA NETHERITU (OPRÓCZ MIECZA) ---
+    // --- BLOKOWANIE STOŁU KOWALSKIEGO (SMITHING TABLE) DLA NETHERITU ---
     @EventHandler
     public void onPrepareSmithing(PrepareSmithingEvent event) {
-        if (!getConfig().getBoolean("netherite.blocked_except_sword", true)) return;
-        
         ItemStack result = event.getResult();
         if (result != null && isBlockedNetheriteItem(result.getType())) {
             event.setResult(null);
@@ -149,8 +147,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
     @EventHandler
     public void onCraft(CraftItemEvent event) {
-        if (!getConfig().getBoolean("netherite.blocked_except_sword", true)) return;
-        
         Material result = event.getRecipe().getResult().getType();
         if (isBlockedNetheriteItem(result)) {
             event.setCancelled(true);
@@ -161,10 +157,18 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     }
 
     private boolean isBlockedNetheriteItem(Material m) {
-        return m.name().startsWith("NETHERITE_") 
-                && m != Material.NETHERITE_SWORD 
-                && m != Material.NETHERITE_INGOT 
-                && m != Material.NETHERITE_SCRAP;
+        if (!m.name().startsWith("NETHERITE_") || m == Material.NETHERITE_SWORD || m == Material.NETHERITE_INGOT || m == Material.NETHERITE_SCRAP) {
+            return false;
+        }
+
+        // Ogólna blokada wszystkich części oprócz miecza
+        if (getConfig().getBoolean("netherite.blocked_except_sword", true)) {
+            return true;
+        }
+
+        // Sprawdzanie poszczególnych elementów w configu
+        String itemName = m.name().toLowerCase().replace("netherite_", "");
+        return getConfig().getBoolean("netherite.blocked_items." + itemName, false);
     }
 
     // --- ATAKI Z TRIDENTA ORAZ MACA ---
@@ -253,7 +257,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
 
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [netherite/cobweb/pearls/gapples/strength_2/speed_2/mace_cooldown/trident_cooldown] [wartość]");
+            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [opcja] [wartość]");
             return true;
         }
 
@@ -263,6 +267,9 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         try {
             if (option.equals("netherite")) {
                 getConfig().set("netherite.blocked_except_sword", Boolean.parseBoolean(val));
+            } else if (option.startsWith("netherite_")) {
+                String subItem = option.replace("netherite_", "");
+                getConfig().set("netherite.blocked_items." + subItem, Boolean.parseBoolean(val));
             } else if (option.equals("cobweb")) {
                 getConfig().set("limits.cobweb", Integer.parseInt(val));
             } else if (option.equals("pearls")) {
@@ -291,16 +298,34 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return true;
     }
 
+    // --- TAB COMPLETER (PODPOWIADANIE POD TAB) ---
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            List<String> options = Arrays.asList("netherite", "cobweb", "pearls", "gapples", "strength_2", "speed_2", "mace_cooldown", "trident_cooldown");
+            List<String> options = Arrays.asList(
+                "netherite", 
+                "netherite_helmet", 
+                "netherite_chestplate", 
+                "netherite_leggings", 
+                "netherite_boots", 
+                "netherite_pickaxe", 
+                "netherite_axe", 
+                "netherite_shovel", 
+                "netherite_hoe", 
+                "cobweb", 
+                "pearls", 
+                "gapples", 
+                "strength_2", 
+                "speed_2", 
+                "mace_cooldown", 
+                "trident_cooldown"
+            );
             for (String opt : options) {
                 if (opt.startsWith(args[0].toLowerCase())) completions.add(opt);
             }
         } else if (args.length == 2) {
-            if (args[0].equalsIgnoreCase("netherite")) {
+            if (args[0].toLowerCase().startsWith("netherite")) {
                 completions.addAll(Arrays.asList("true", "false"));
             } else {
                 completions.addAll(Arrays.asList("0", "1", "2", "3", "5", "10", "16", "32"));

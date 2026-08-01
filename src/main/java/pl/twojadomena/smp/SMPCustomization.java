@@ -8,6 +8,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
@@ -20,6 +21,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -107,8 +109,8 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return false;
     }
 
-    // --- ATAK MACE ORAZ LEWY PRZYCISK NA MOBA ---
-    @EventHandler
+    // --- ATAK PRZY UDERZENIU (LEWY PRZYCISK MYSZY) ---
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
             ItemStack mainHand = player.getInventory().getItemInMainHand();
@@ -118,7 +120,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 if (cdSeconds > 0) {
                     if (player.hasCooldown(mainHand.getType())) {
                         event.setCancelled(true);
-                        player.sendMessage(ChatColor.RED + "Mace jest na cooldownie!");
                         return;
                     }
                     player.setCooldown(mainHand.getType(), cdSeconds * 20);
@@ -130,7 +131,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 if (cdSeconds > 0) {
                     if (player.hasCooldown(mainHand.getType())) {
                         event.setCancelled(true);
-                        player.sendMessage(ChatColor.RED + "Spear jest na cooldownie!");
                         return;
                     }
                     player.setCooldown(mainHand.getType(), cdSeconds * 20);
@@ -139,8 +139,8 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BLOKADA RUCHU / LUNGE (PRAWY I LEWY PRZYCISK) ---
-    @EventHandler
+    // --- BEZPOŚREDNIE ANULOWANIE RUCHU LUNGE (PRAWY/LEWY KLIK) ---
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
@@ -149,14 +149,17 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         if (isSpear(item)) {
             int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
             if (cdSeconds > 0) {
-                // JEŚLI JEST NA COOLDOWNIE: Blokujemy każdy klik (zarówno lewy jak i prawy/lunge)
+                // JEŚLI JEST NA COOLDOWNIE: Blokujemy wybicie/LUNGE fizycznie!
                 if (player.hasCooldown(item.getType())) {
                     event.setCancelled(true);
-                    player.sendMessage(ChatColor.RED + "Spear jest na cooldownie! Nie mozesz uzyc lunge!");
+                    
+                    // Fizycznie kasujemy pęd ruchowy (zatrzymujemy gracza w miejscu)
+                    Vector currentVel = player.getVelocity();
+                    player.setVelocity(new Vector(0, Math.min(0, currentVel.getY()), 0));
                     return;
                 }
 
-                // JEŚLI NIE JEST NA COOLDOWNIE: Nakładamy cooldown przy próbie lunge (Prawy Klik) lub zamachu (Lewy Klik)
+                // JEŚLI NIE JEST NA COOLDOWNIE: Zaczynamy cooldown przy interakcji
                 if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK ||
                     event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
                     player.setCooldown(item.getType(), cdSeconds * 20);

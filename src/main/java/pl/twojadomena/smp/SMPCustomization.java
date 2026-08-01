@@ -44,13 +44,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- SPRAWDZANIE WSZYSTKICH LIMITÓW ---
+    // --- SPRAWDZANIE LIMITÓW PRZEDMIOTÓW I POTEK ---
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
         checkAndDropLimit(player, Material.ENDER_PEARL, getConfig().getInt("limits.ender_pearl", 0));
         checkAndDropLimit(player, Material.GOLDEN_APPLE, getConfig().getInt("limits.golden_apple", 32));
         
-        // Limity mikstur poziomu 2
         checkAndDropPotionLimit(player, PotionType.STRENGTH, getConfig().getInt("limits.strength_2", 2));
         checkAndDropPotionLimit(player, PotionType.SWIFTNESS, getConfig().getInt("limits.speed_2", 2));
     }
@@ -75,11 +74,10 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
                 if (toRemove <= 0) break;
             }
-            player.sendMessage(ChatColor.RED + "Masz za duzo " + material.name() + "! Przedmioty spadly na ziemie.");
+            player.sendMessage(ChatColor.RED + "Masz za dużo " + material.name() + "! Przedmioty spadły na ziemię.");
         }
     }
 
-    // --- METODA EGZEKWUJĄCA LIMIT DLA MIKSTUR TIER II ---
     private void checkAndDropPotionLimit(Player player, PotionType targetType, int maxLimit) {
         int total = countPotions(player, targetType);
         if (total > maxLimit) {
@@ -142,29 +140,31 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
+    // --- BLOKOWANIE RZEMIOSŁA WSZYSTKICH PRZEDMIOTÓW Z NETHERITU (ZBROJA + NARRZĘDZIA), OPRÓCZ MIECZA ---
     @EventHandler
     public void onCraft(CraftItemEvent event) {
         if (!getConfig().getBoolean("netherite.blocked_except_sword", true)) return;
+        
         Material result = event.getRecipe().getResult().getType();
-        if (isNetheriteItem(result) && result != Material.NETHERITE_SWORD) {
+        
+        // Blokuje: Zbroję (HELMET, CHESTPLATE, LEGGINGS, BOOTS) oraz Narzędzia (PICKAXE, AXE, SHOVEL, HOE)
+        if (isBlockedNetheriteItem(result)) {
             event.setCancelled(true);
             if (event.getWhoClicked() instanceof Player player) {
-                player.sendMessage(ChatColor.RED + "Tworzenie tego przedmiotu z netheritu jest zablokowane!");
+                player.sendMessage(ChatColor.RED + "Tworzenie jakichkolwiek przedmiotów z netheritu (oprócz miecza) jest zablokowane!");
             }
         }
     }
 
-    private boolean isSpear(ItemStack item) {
-        if (item == null || item.getType() == Material.AIR) return false;
-        String typeName = item.getType().name();
-        if (typeName.contains("SPEAR")) return true;
-        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-            return item.getItemMeta().getDisplayName().toUpperCase().contains("SPEAR") || 
-                   item.getItemMeta().getDisplayName().toUpperCase().contains("WŁÓCZNIA");
-        }
-        return false;
+    private boolean isBlockedNetheriteItem(Material m) {
+        // Wszystko co zaczyna się od NETHERITE_ i nie jest Mieczem, Sztabką lub Odłamkiem
+        return m.name().startsWith("NETHERITE_") 
+                && m != Material.NETHERITE_SWORD 
+                && m != Material.NETHERITE_INGOT 
+                && m != Material.NETHERITE_SCRAP;
     }
 
+    // --- ATAKI Z TRIDENTA ORAZ MACA ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
@@ -181,30 +181,35 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
             }
 
-            if (isSpear(mainHand)) {
-                int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
+            // TRIDENT COOLDOWN PRZY ATAKU
+            if (mainHand.getType() == Material.TRIDENT) {
+                int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
                 if (cdSeconds > 0) {
-                    if (player.hasCooldown(mainHand.getType())) {
+                    if (player.hasCooldown(Material.TRIDENT)) {
                         event.setCancelled(true);
                         return;
                     }
-                    player.setCooldown(mainHand.getType(), cdSeconds * 20);
+                    player.setCooldown(Material.TRIDENT, cdSeconds * 20);
                 }
             }
         }
     }
 
+    // --- TRIDENT INTERAKCJA I FIZYCZNA BLOKADA (RIPTIDE / RZUT) ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         ItemStack item = event.getItem();
         if (item == null) return;
 
-        if (isSpear(item)) {
-            int cdSeconds = getConfig().getInt("cooldowns.spear", 0);
+        // OBŁUGA TRÓJZAŁU (TRIDENT)
+        if (item.getType() == Material.TRIDENT) {
+            int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
             if (cdSeconds > 0) {
-                if (player.hasCooldown(item.getType())) {
+                if (player.hasCooldown(Material.TRIDENT)) {
                     event.setCancelled(true);
+                    
+                    // Fizycznie kasujemy ruch (Riptide / pęd)
                     Vector currentVel = player.getVelocity();
                     player.setVelocity(new Vector(0, Math.min(0, currentVel.getY()), 0));
                     return;
@@ -212,7 +217,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
                 if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK ||
                     event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
-                    player.setCooldown(item.getType(), cdSeconds * 20);
+                    player.setCooldown(Material.TRIDENT, cdSeconds * 20);
                 }
             }
         }
@@ -229,10 +234,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     @EventHandler
     public void onBlockPlace(BlockPlaceEvent event) {
         enforceLimits(event.getPlayer());
-    }
-
-    private boolean isNetheriteItem(Material m) {
-        return m.name().startsWith("NETHERITE_") && m != Material.NETHERITE_INGOT && m != Material.NETHERITE_SCRAP;
     }
 
     private int countItems(Player player, Material material) {
@@ -262,7 +263,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
 
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [netherite/cobweb/pearls/gapples/strength_2/speed_2/mace_cooldown/spear_cooldown] [wartość]");
+            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [netherite/cobweb/pearls/gapples/strength_2/speed_2/mace_cooldown/trident_cooldown] [wartość]");
             return true;
         }
 
@@ -284,8 +285,8 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 getConfig().set("limits.speed_2", Integer.parseInt(val));
             } else if (option.equals("mace_cooldown")) {
                 getConfig().set("cooldowns.mace", Integer.parseInt(val));
-            } else if (option.equals("spear_cooldown")) {
-                getConfig().set("cooldowns.spear", Integer.parseInt(val));
+            } else if (option.equals("trident_cooldown")) {
+                getConfig().set("cooldowns.trident", Integer.parseInt(val));
             } else {
                 sender.sendMessage(ChatColor.RED + "Nieznana opcja!");
                 return true;
@@ -304,7 +305,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            List<String> options = Arrays.asList("netherite", "cobweb", "pearls", "gapples", "strength_2", "speed_2", "mace_cooldown", "spear_cooldown");
+            List<String> options = Arrays.asList("netherite", "cobweb", "pearls", "gapples", "strength_2", "speed_2", "mace_cooldown", "trident_cooldown");
             for (String opt : options) {
                 if (opt.startsWith(args[0].toLowerCase())) completions.add(opt);
             }

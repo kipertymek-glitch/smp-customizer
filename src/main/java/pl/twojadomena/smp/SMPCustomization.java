@@ -16,6 +16,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
@@ -140,24 +141,33 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BLOKOWANIE RZEMIOSŁA WSZYSTKICH PRZEDMIOTÓW Z NETHERITU (ZBROJA + NARRZĘDZIA), OPRÓCZ MIECZA ---
+    // --- BLOKOWANIE STOŁU KOWALSKIEGO (SMITHING TABLE) DLA ZBROI I TOOLÓW NETHERITOWYCH ---
+    @EventHandler
+    public void onPrepareSmithing(PrepareSmithingEvent event) {
+        if (!getConfig().getBoolean("netherite.blocked_except_sword", true)) return;
+        
+        ItemStack result = event.getResult();
+        if (result != null && isBlockedNetheriteItem(result.getType())) {
+            // Ukrywamy/kasujemy wynik rzemiosła – player w ogóle nie stworzy przedmiotu!
+            event.setResult(null);
+        }
+    }
+
+    // Asekuracyjnie blokujemy również zwykły Crafting (gdyby istniał jakiś customowy przepis)
     @EventHandler
     public void onCraft(CraftItemEvent event) {
         if (!getConfig().getBoolean("netherite.blocked_except_sword", true)) return;
         
         Material result = event.getRecipe().getResult().getType();
-        
-        // Blokuje: Zbroję (HELMET, CHESTPLATE, LEGGINGS, BOOTS) oraz Narzędzia (PICKAXE, AXE, SHOVEL, HOE)
         if (isBlockedNetheriteItem(result)) {
             event.setCancelled(true);
             if (event.getWhoClicked() instanceof Player player) {
-                player.sendMessage(ChatColor.RED + "Tworzenie jakichkolwiek przedmiotów z netheritu (oprócz miecza) jest zablokowane!");
+                player.sendMessage(ChatColor.RED + "Tworzenie tego przedmiotu z netheritu jest zablokowane!");
             }
         }
     }
 
     private boolean isBlockedNetheriteItem(Material m) {
-        // Wszystko co zaczyna się od NETHERITE_ i nie jest Mieczem, Sztabką lub Odłamkiem
         return m.name().startsWith("NETHERITE_") 
                 && m != Material.NETHERITE_SWORD 
                 && m != Material.NETHERITE_INGOT 
@@ -181,7 +191,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
             }
 
-            // TRIDENT COOLDOWN PRZY ATAKU
             if (mainHand.getType() == Material.TRIDENT) {
                 int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
                 if (cdSeconds > 0) {
@@ -202,14 +211,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         ItemStack item = event.getItem();
         if (item == null) return;
 
-        // OBŁUGA TRÓJZAŁU (TRIDENT)
         if (item.getType() == Material.TRIDENT) {
             int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
             if (cdSeconds > 0) {
                 if (player.hasCooldown(Material.TRIDENT)) {
                     event.setCancelled(true);
                     
-                    // Fizycznie kasujemy ruch (Riptide / pęd)
                     Vector currentVel = player.getVelocity();
                     player.setVelocity(new Vector(0, Math.min(0, currentVel.getY()), 0));
                     return;

@@ -42,7 +42,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- SPRAWDZANIE LIMITÓW PRZEDMIOTÓW I POTEK ---
+    // --- ENFORCE ITEM AND POTION LIMITS ---
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
         checkAndDropLimit(player, Material.ENDER_PEARL, getConfig().getInt("limits.ender_pearl", 0));
@@ -72,7 +72,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
                 if (toRemove <= 0) break;
             }
-            player.sendMessage(ChatColor.RED + "Masz za dużo " + material.name() + "! Przedmioty spadły na ziemię.");
+            player.sendMessage(ChatColor.RED + "You have too many " + material.name() + "! Excess items dropped on the ground.");
         }
     }
 
@@ -97,7 +97,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 }
                 if (toRemove <= 0) break;
             }
-            player.sendMessage(ChatColor.RED + "Masz za dużo potek " + targetType.name() + " II! Przedmioty spadły na ziemię.");
+            player.sendMessage(ChatColor.RED + "You have too many " + targetType.name() + " II potions! Excess items dropped on the ground.");
         }
     }
 
@@ -131,12 +131,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- STÓŁ KOWALSKI (SMITHING TABLE) BLOKADA WYNIKU I KLIKNIĘCIA ---
+    // --- SMITHING TABLE NETHERITE BLOCKING ---
     @EventHandler
     public void onPrepareSmithing(PrepareSmithingEvent event) {
         ItemStack result = event.getResult();
         if (result != null && isBlockedNetheriteItem(result.getType())) {
-            event.setResult(null); // Czyszczenie podglądu wyniku
+            event.setResult(null);
         }
     }
 
@@ -145,13 +145,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         if (event.getWhoClicked() instanceof Player player) {
             getServer().getScheduler().runTask(this, () -> enforceLimits(player));
 
-            // Blokowanie wyciągania zablokowanych przedmiotów ze Stołu Kowalskiego (slot wyjściowy: RESULT / slot 3)
             if (event.getInventory().getType() == InventoryType.SMITHING) {
                 if (event.getSlotType() == InventoryType.SlotType.RESULT) {
                     ItemStack currentItem = event.getCurrentItem();
                     if (currentItem != null && isBlockedNetheriteItem(currentItem.getType())) {
                         event.setCancelled(true);
-                        player.sendMessage(ChatColor.RED + "Tworzenie tego przedmiotu z netheritu jest zablokowane!");
+                        player.sendMessage(ChatColor.RED + "Crafting this Netherite item is blocked!");
                     }
                 }
             }
@@ -164,28 +163,29 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         if (isBlockedNetheriteItem(result)) {
             event.setCancelled(true);
             if (event.getWhoClicked() instanceof Player player) {
-                player.sendMessage(ChatColor.RED + "Tworzenie tego przedmiotu z netheritu jest zablokowane!");
+                player.sendMessage(ChatColor.RED + "Crafting this Netherite item is blocked!");
             }
         }
     }
 
-    // GŁÓWNA LOGIKA BLOKADY NETHERITU (MIECZ JEST ZAWSZE DOZWOLONY)
     private boolean isBlockedNetheriteItem(Material m) {
         if (!m.name().startsWith("NETHERITE_") || m == Material.NETHERITE_SWORD || m == Material.NETHERITE_INGOT || m == Material.NETHERITE_SCRAP) {
             return false;
         }
 
-        // Jeśli netherite.blocked_except_sword = true (domyślnie), blokuje wszystko oprócz miecza
-        if (getConfig().getBoolean("netherite.blocked_except_sword", true)) {
-            return true;
+        if (getConfig().getBoolean("netherite.allow_crafting", false)) {
+            return false;
         }
 
-        // Sprawdzanie poszczególnych elementów w konfiguracji
         String itemName = m.name().toLowerCase().replace("netherite_", "");
-        return getConfig().getBoolean("netherite.blocked_items." + itemName, false);
+        if (getConfig().contains("netherite.blocked_items." + itemName)) {
+            return getConfig().getBoolean("netherite.blocked_items." + itemName, true);
+        }
+
+        return true;
     }
 
-    // --- ATAKI Z MACA ORAZ TRIDENTA ---
+    // --- ATTACKS WITH WEAPONS ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAttack(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof Player player) {
@@ -213,7 +213,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- INNE INTERAKCJE (PERŁY) ---
+    // --- OTHER INTERACTIONS ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         ItemStack item = event.getItem();
@@ -223,12 +223,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             int max = getConfig().getInt("limits.ender_pearl", 0);
             if (max <= 0) {
                 event.setCancelled(true);
-                event.getPlayer().sendMessage(ChatColor.RED + "Perły są całkowicie wyłączone!");
+                event.getPlayer().sendMessage(ChatColor.RED + "Ender pearls are completely disabled!");
             }
         }
     }
 
-    // --- NAKŁADANIE COOLDOWNU PO RZUCIE ---
+    // --- TRIDENT THROW COOLDOWN ---
     @EventHandler
     public void onTridentThrow(ProjectileLaunchEvent event) {
         if (event.getEntity() instanceof Trident && event.getEntity().getShooter() instanceof Player player) {
@@ -239,7 +239,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- NAKŁADANIE COOLDOWNU PO RIPTIDE ---
+    // --- RIPTIDE COOLDOWN ---
     @EventHandler
     public void onRiptide(PlayerRiptideEvent event) {
         Player player = event.getPlayer();
@@ -262,16 +262,16 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return count;
     }
 
-    // --- KOMENDA KONFIGURACYJNA ---
+    // --- CONFIG COMMAND ---
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!sender.hasPermission("smp.admin")) {
-            sender.sendMessage(ChatColor.RED + "Nie masz uprawnień!");
+            sender.sendMessage(ChatColor.RED + "You do not have permission!");
             return true;
         }
 
         if (args.length < 2) {
-            sender.sendMessage(ChatColor.YELLOW + "Użycie: /smpconfig [opcja] [wartość]");
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /smpconfig [option] [value]");
             return true;
         }
 
@@ -280,7 +280,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
         try {
             if (option.equals("netherite")) {
-                getConfig().set("netherite.blocked_except_sword", Boolean.parseBoolean(val));
+                getConfig().set("netherite.allow_crafting", Boolean.parseBoolean(val));
             } else if (option.startsWith("netherite_")) {
                 String subItem = option.replace("netherite_", "");
                 getConfig().set("netherite.blocked_items." + subItem, Boolean.parseBoolean(val));
@@ -299,14 +299,14 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             } else if (option.equals("trident_cooldown")) {
                 getConfig().set("cooldowns.trident", Integer.parseInt(val));
             } else {
-                sender.sendMessage(ChatColor.RED + "Nieznana opcja!");
+                sender.sendMessage(ChatColor.RED + "Unknown option!");
                 return true;
             }
 
             saveConfig();
-            sender.sendMessage(ChatColor.GREEN + "Ustawiono " + option + " na " + val + "!");
+            sender.sendMessage(ChatColor.GREEN + "Set " + option + " to " + val + "!");
         } catch (Exception e) {
-            sender.sendMessage(ChatColor.RED + "Błędna wartość!");
+            sender.sendMessage(ChatColor.RED + "Invalid value!");
         }
 
         return true;

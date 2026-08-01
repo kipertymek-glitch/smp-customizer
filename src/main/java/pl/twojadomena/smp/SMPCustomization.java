@@ -7,17 +7,19 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Trident;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerRiptideEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -161,12 +163,10 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             return false;
         }
 
-        // Ogólna blokada wszystkich części oprócz miecza
         if (getConfig().getBoolean("netherite.blocked_except_sword", true)) {
             return true;
         }
 
-        // Sprawdzanie poszczególnych elementów w configu
         String itemName = m.name().toLowerCase().replace("netherite_", "");
         return getConfig().getBoolean("netherite.blocked_items." + itemName, false);
     }
@@ -193,15 +193,13 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 if (cdSeconds > 0) {
                     if (player.hasCooldown(Material.TRIDENT)) {
                         event.setCancelled(true);
-                        return;
                     }
-                    player.setCooldown(Material.TRIDENT, cdSeconds * 20);
                 }
             }
         }
     }
 
-    // --- TRIDENT INTERAKCJA I FIZYCZNA BLOKADA (RIPTIDE / RZUT) ---
+    // --- BLOKADA PRÓBY UŻYCIA TRÓJZAŁA PODCZAS AKTYWNEGO COOLDOWNU ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
@@ -210,19 +208,11 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
         if (item.getType() == Material.TRIDENT) {
             int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
-            if (cdSeconds > 0) {
-                if (player.hasCooldown(Material.TRIDENT)) {
-                    event.setCancelled(true);
-                    
-                    Vector currentVel = player.getVelocity();
-                    player.setVelocity(new Vector(0, Math.min(0, currentVel.getY()), 0));
-                    return;
-                }
-
-                if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK ||
-                    event.getAction() == Action.LEFT_CLICK_AIR || event.getAction() == Action.LEFT_CLICK_BLOCK) {
-                    player.setCooldown(Material.TRIDENT, cdSeconds * 20);
-                }
+            if (cdSeconds > 0 && player.hasCooldown(Material.TRIDENT)) {
+                event.setCancelled(true);
+                Vector currentVel = player.getVelocity();
+                player.setVelocity(new Vector(0, Math.min(0, currentVel.getY()), 0));
+                return;
             }
         }
 
@@ -232,6 +222,27 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 event.setCancelled(true);
                 player.sendMessage(ChatColor.RED + "Perły są całkowicie wyłączone!");
             }
+        }
+    }
+
+    // --- NAKŁADANIE COOLDOWNU PO FAKTYCZNYM RZUCIE TRÓJZAŁEM ---
+    @EventHandler
+    public void onTridentThrow(ProjectileLaunchEvent event) {
+        if (event.getEntity() instanceof Trident && event.getEntity().getShooter() instanceof Player player) {
+            int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
+            if (cdSeconds > 0) {
+                player.setCooldown(Material.TRIDENT, cdSeconds * 20);
+            }
+        }
+    }
+
+    // --- NAKŁADANIE COOLDOWNU PO FAKTYCZNYM UŻYCIU RIPTIDE ---
+    @EventHandler
+    public void onRiptide(PlayerRiptideEvent event) {
+        Player player = event.getPlayer();
+        int cdSeconds = getConfig().getInt("cooldowns.trident", 0);
+        if (cdSeconds > 0) {
+            player.setCooldown(Material.TRIDENT, cdSeconds * 20);
         }
     }
 
@@ -298,7 +309,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         return true;
     }
 
-    // --- TAB COMPLETER (PODPOWIADANIE POD TAB) ---
+    // --- TAB COMPLETER ---
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> completions = new ArrayList<>();

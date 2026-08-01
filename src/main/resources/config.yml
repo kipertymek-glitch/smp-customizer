@@ -2,10 +2,21 @@ limits:
   cobweb: 16
   ender_pearl: 0
   golden_apple: 32
+  strength_2: 2
+  speed_2: 2
 
 cooldowns:
-  mace: 3      # Cooldown w sekundach na buławę
-  spear: 5     # Cooldown w sekundach na trójząb / oszczep
+  mace: 5
+  trident: 3
 
 netherite:
-  blocked_except_sword: true
+  allow_crafting: false # Jeśli damy 'true', wszystko z netheritu można robić. Jeśli 'false', można robić TYLKO miecz.
+  blocked_items:
+    helmet: false
+    chestplate: false
+    leggings: false
+    boots: false
+    pickaxe: false
+    axe: false
+    shovel: false
+    hoe: false

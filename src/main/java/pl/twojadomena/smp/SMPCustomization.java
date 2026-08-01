@@ -46,7 +46,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     // --- ENFORCE ITEM AND POTION LIMITS ---
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
-        checkAndDropLimit(player, Material.GOLDEN_APPLE, getConfig().getInt("limits.golden_apple", 32));
+        checkAndDropLimit(player, Material.GOLDEN_APPLE, getConfig().getInt("limits.golden_apple", 48));
         
         checkAndDropPotionLimit(player, PotionType.STRENGTH, getConfig().getInt("limits.strength_2", 2));
         checkAndDropPotionLimit(player, PotionType.SWIFTNESS, getConfig().getInt("limits.speed_2", 2));
@@ -225,7 +225,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
     }
 
-    // --- BLOCK THROWING ENDER PEARLS ONLY ---
+    // --- BLOCK THROWING ENDER PEARLS WHEN SET TO OFF ---
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onInteract(PlayerInteractEvent event) {
         ItemStack item = event.getItem();
@@ -233,8 +233,8 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
 
         if (item.getType() == Material.ENDER_PEARL) {
             if (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-                int maxPearlLimit = getConfig().getInt("limits.ender_pearl", 0);
-                if (maxPearlLimit <= 0) {
+                boolean pearlEnabled = getConfig().getBoolean("limits.ender_pearl_enabled", true);
+                if (!pearlEnabled) {
                     event.setCancelled(true);
                     event.getPlayer().sendMessage(ChatColor.RED + "Throwing Ender Pearls is disabled on this server!");
                 }
@@ -290,37 +290,48 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         }
 
         String option = args[0].toLowerCase();
-        String val = args[1];
+        String val = args[1].toLowerCase();
 
         try {
-            if (option.equals("netherite")) {
-                getConfig().set("netherite.allow_crafting", Boolean.parseBoolean(val));
-            } else if (option.startsWith("netherite_")) {
-                String subItem = option.replace("netherite_", "");
-                getConfig().set("netherite.blocked_items." + subItem, Boolean.parseBoolean(val));
-            } else if (option.equals("cobweb")) {
-                getConfig().set("limits.cobweb", Integer.parseInt(val));
-            } else if (option.equals("pearls")) {
-                getConfig().set("limits.ender_pearl", Integer.parseInt(val));
-            } else if (option.equals("gapples")) {
-                getConfig().set("limits.golden_apple", Integer.parseInt(val));
-            } else if (option.equals("strength_2")) {
-                getConfig().set("limits.strength_2", Integer.parseInt(val));
-            } else if (option.equals("speed_2")) {
-                getConfig().set("limits.speed_2", Integer.parseInt(val));
-            } else if (option.equals("mace_cooldown")) {
-                getConfig().set("cooldowns.mace", Integer.parseInt(val));
-            } else if (option.equals("trident_cooldown")) {
-                getConfig().set("cooldowns.trident", Integer.parseInt(val));
-            } else if (option.equals("spear_cooldown")) {
-                getConfig().set("cooldowns.spear", Integer.parseInt(val));
-            } else {
-                sender.sendMessage(ChatColor.RED + "Unknown option!");
-                return true;
+            // Opcje typu ON / OFF (dla pereł i netheritu)
+            if (option.equals("pearls") || option.startsWith("netherite")) {
+                boolean state = val.equals("on") || val.equals("true") || val.equals("enable");
+                
+                if (option.equals("pearls")) {
+                    getConfig().set("limits.ender_pearl_enabled", state);
+                } else if (option.equals("netherite")) {
+                    getConfig().set("netherite.allow_crafting", state);
+                } else if (option.startsWith("netherite_")) {
+                    String subItem = option.replace("netherite_", "");
+                    getConfig().set("netherite.blocked_items." + subItem, state);
+                }
+            } 
+            // Opcje z LICZBAMI (limity przedmiotów i cooldowny)
+            else {
+                int numberVal = Integer.parseInt(val);
+
+                if (option.equals("cobweb")) {
+                    getConfig().set("limits.cobweb", numberVal);
+                } else if (option.equals("gapples")) {
+                    getConfig().set("limits.golden_apple", numberVal);
+                } else if (option.equals("strength_2")) {
+                    getConfig().set("limits.strength_2", numberVal);
+                } else if (option.equals("speed_2")) {
+                    getConfig().set("limits.speed_2", numberVal);
+                } else if (option.equals("mace_cooldown")) {
+                    getConfig().set("cooldowns.mace", numberVal);
+                } else if (option.equals("trident_cooldown")) {
+                    getConfig().set("cooldowns.trident", numberVal);
+                } else if (option.equals("spear_cooldown")) {
+                    getConfig().set("cooldowns.spear", numberVal);
+                } else {
+                    sender.sendMessage(ChatColor.RED + "Unknown option!");
+                    return true;
+                }
             }
 
             saveConfig();
-            sender.sendMessage(ChatColor.GREEN + "Set " + option + " to " + val + "!");
+            sender.sendMessage(ChatColor.GREEN + "Set " + option + " to " + val.toUpperCase() + "!");
         } catch (Exception e) {
             sender.sendMessage(ChatColor.RED + "Invalid value!");
         }
@@ -334,6 +345,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
             List<String> options = Arrays.asList(
+                "pearls",
                 "netherite", 
                 "netherite_helmet", 
                 "netherite_chestplate", 
@@ -344,7 +356,6 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 "netherite_shovel", 
                 "netherite_hoe", 
                 "cobweb", 
-                "pearls", 
                 "gapples", 
                 "strength_2", 
                 "speed_2", 
@@ -356,10 +367,13 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 if (opt.startsWith(args[0].toLowerCase())) completions.add(opt);
             }
         } else if (args.length == 2) {
-            if (args[0].toLowerCase().startsWith("netherite")) {
-                completions.addAll(Arrays.asList("true", "false"));
-            } else {
-                completions.addAll(Arrays.asList("0", "1", "2", "3", "5", "10", "16", "32"));
+            // Perły i netherit podpowiadają ON / OFF
+            if (args[0].toLowerCase().equals("pearls") || args[0].toLowerCase().startsWith("netherite")) {
+                completions.addAll(Arrays.asList("on", "off"));
+            } 
+            // Przedmioty podpowiadają przykładowe ilości (np. 16, 32, 48, 64)
+            else {
+                completions.addAll(Arrays.asList("0", "1", "2", "3", "5", "10", "16", "32", "48", "64"));
             }
         }
         return completions;

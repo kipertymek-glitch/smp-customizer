@@ -169,17 +169,19 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     }
 
     private boolean isBlockedNetheriteItem(Material m) {
-        if (!m.name().startsWith("NETHERITE_") || m == Material.NETHERITE_SWORD || m == Material.NETHERITE_INGOT || m == Material.NETHERITE_SCRAP) {
+        if (!m.name().startsWith("NETHERITE_") || m == Material.NETHERITE_INGOT || m == Material.NETHERITE_SCRAP) {
             return false;
         }
 
+        // Globalny przełącznik - gdy włączony ('true'), odblokowuje wszystko
         if (getConfig().getBoolean("netherite.allow_crafting", false)) {
             return false;
         }
 
         String itemName = m.name().toLowerCase().replace("netherite_", "");
         if (getConfig().contains("netherite.blocked_items." + itemName)) {
-            return getConfig().getBoolean("netherite.blocked_items." + itemName, true);
+            // Jeśli ustawienie zwraca 'true' (odblokowany), to isBlocked zwraca 'false'
+            return !getConfig().getBoolean("netherite.blocked_items." + itemName, false);
         }
 
         return true;
@@ -293,7 +295,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         String val = args[1].toLowerCase();
 
         try {
-            // Opcje typu ON / OFF (dla pereł i netheritu)
+            // Opcje typu ON / OFF (dla pereł i przedmioty netheritowe)
             if (option.equals("pearls") || option.startsWith("netherite")) {
                 boolean state = val.equals("on") || val.equals("true") || val.equals("enable");
                 
@@ -347,6 +349,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             List<String> options = Arrays.asList(
                 "pearls",
                 "netherite", 
+                "netherite_sword",
                 "netherite_helmet", 
                 "netherite_chestplate", 
                 "netherite_leggings", 
@@ -367,12 +370,9 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
                 if (opt.startsWith(args[0].toLowerCase())) completions.add(opt);
             }
         } else if (args.length == 2) {
-            // Perły i netherit podpowiadają ON / OFF
             if (args[0].toLowerCase().equals("pearls") || args[0].toLowerCase().startsWith("netherite")) {
                 completions.addAll(Arrays.asList("on", "off"));
-            } 
-            // Przedmioty podpowiadają przykładowe ilości (np. 16, 32, 48, 64)
-            else {
+            } else {
                 completions.addAll(Arrays.asList("0", "1", "2", "3", "5", "10", "16", "32", "48", "64"));
             }
         }

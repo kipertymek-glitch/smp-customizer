@@ -47,6 +47,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
     private void enforceLimits(Player player) {
         checkAndDropLimit(player, Material.COBWEB, getConfig().getInt("limits.cobweb", 16));
         checkAndDropLimit(player, Material.GOLDEN_APPLE, getConfig().getInt("limits.golden_apple", 48));
+        checkAndDropLimit(player, Material.TOTEM_OF_UNDYING, getConfig().getInt("limits.totems", 2));
         
         checkAndDropPotionLimit(player, PotionType.STRENGTH, getConfig().getInt("limits.strength_2", 2));
         checkAndDropPotionLimit(player, PotionType.SWIFTNESS, getConfig().getInt("limits.speed_2", 2));
@@ -173,14 +174,12 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             return false;
         }
 
-        // Globalny przełącznik - gdy włączony ('true'), odblokowuje wszystko
         if (getConfig().getBoolean("netherite.allow_crafting", false)) {
             return false;
         }
 
         String itemName = m.name().toLowerCase().replace("netherite_", "");
         if (getConfig().contains("netherite.blocked_items." + itemName)) {
-            // Jeśli ustawienie zwraca 'true' (odblokowany), to isBlocked zwraca 'false'
             return !getConfig().getBoolean("netherite.blocked_items." + itemName, false);
         }
 
@@ -295,7 +294,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         String val = args[1].toLowerCase();
 
         try {
-            // Opcje typu ON / OFF (dla pereł i przedmioty netheritowe)
+            // Opcje typu ON / OFF (dla pereł i przedmiotów netheritowych)
             if (option.equals("pearls") || option.startsWith("netherite")) {
                 boolean state = val.equals("on") || val.equals("true") || val.equals("enable");
                 
@@ -312,7 +311,9 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
             else {
                 int numberVal = Integer.parseInt(val);
 
-                if (option.equals("cobweb")) {
+                if (option.equals("totems")) {
+                    getConfig().set("limits.totems", numberVal);
+                } else if (option.equals("cobweb")) {
                     getConfig().set("limits.cobweb", numberVal);
                 } else if (option.equals("gapples")) {
                     getConfig().set("limits.golden_apple", numberVal);
@@ -347,6 +348,7 @@ public class SMPCustomization extends JavaPlugin implements Listener, CommandExe
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
             List<String> options = Arrays.asList(
+                "totems",
                 "pearls",
                 "netherite", 
                 "netherite_sword",
